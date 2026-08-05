@@ -43,10 +43,9 @@ pnpm-debug.log*
 .yarn/build-state.yml
 .vite/
 ui/.vite/
-dist/
-build/
-ui/dist/
-ui/build/
+# ui/dist/ is NOT ignored — the runtime has no build step, so the compiled
+# component bundle (ui/dist/diff-tool-ui.mjs) must be committed for
+# contributes.frontend.bundle to resolve (same as aw-app-presentations).
 
 # Test and browser automation output
 test-results/
