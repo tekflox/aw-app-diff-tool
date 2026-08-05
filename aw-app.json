@@ -21,7 +21,7 @@
     "routes:register",
     "ui:code",
     "ui:slots:core.nav",
-    "ui:slots:core.window.body:diff.viewer"
+    "ui:slots:core.window.body:diff-tool.viewer"
   ],
   "contributes": {
     "routes": [
@@ -31,7 +31,7 @@
     ],
     "windows": [
       {
-        "id": "diff.viewer",
+        "id": "diff-tool.viewer",
         "title": "Diff",
         "icon": "git-branch",
         "body": {
@@ -44,7 +44,7 @@
       "bundle": "ui/dist/diff-tool-ui.mjs",
       "slots": [
         "core.nav",
-        "core.window.body:diff.viewer"
+        "core.window.body:diff-tool.viewer"
       ]
     },
     "skills": [

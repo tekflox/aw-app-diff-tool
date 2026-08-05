@@ -1,6 +1,6 @@
 // Integrated-mode entrypoint — dynamic-imported by aw-workspace-ui's
 // loadComponentPlugin() once this app is installed with "ui:code" +
-// "ui:slots:core.nav" + "ui:slots:core.window.body:diff.viewer" granted.
+// "ui:slots:core.nav" + "ui:slots:core.window.body:diff-tool.viewer" granted.
 // Built by `npm run build` -> ui/dist/diff-tool-ui.mjs, referenced from
 // aw-app.json's contributes.frontend.bundle. Same register(host)/JSX-factory
 // pattern as aw-app-presentations/aw-app-whiteboard/aw-app-tasks's
@@ -23,7 +23,7 @@
 //    response and can call window.__awOpenAppWindow directly — but reusing
 //    the same broadcast keeps both entry points on one code path.
 //
-// 2. DiffWindowBody -> core.window.body:diff.viewer. Like Presentations,
+// 2. DiffWindowBody -> core.window.body:diff-tool.viewer. Like Presentations,
 //    this app opens MANY windows at once — one per diff id. Uses the
 //    2026-08-05 framework addition: window.__awOpenAppWindow(windowId,
 //    instanceId, title) keys the window as `appwin:<windowId>:<instanceId>`
@@ -48,7 +48,7 @@ export function register(host) {
             let msg;
             try { msg = JSON.parse(event.data); } catch { return; }
             if (msg.type !== 'diff_open' || !msg.diff) return;
-            window.__awOpenAppWindow?.('diff.viewer', msg.diff.id, msg.diff.title);
+            window.__awOpenAppWindow?.('diff-tool.viewer', msg.diff.id, msg.diff.title);
           };
           ws.onclose = () => { if (!closed) reconnectTimer = setTimeout(connect, 5000); };
           ws.onerror = () => { try { ws.close(); } catch {} };
@@ -113,7 +113,7 @@ export function register(host) {
   }
 
   host.registerSlot('core.nav', DiffToolListener);
-  host.registerWindow('diff.viewer', DiffWindowBody);
+  host.registerWindow('diff-tool.viewer', DiffWindowBody);
 }
 
 export default register;
