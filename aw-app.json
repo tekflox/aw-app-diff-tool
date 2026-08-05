@@ -2,7 +2,7 @@
   "manifest_version": 1,
   "id": "diff-tool",
   "name": "Diff Tool",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "Interactive git diff viewer + commit panel, decoupled from the monolith. Two entry points: an agent's show_diff MCP tool call, or the git repo nav's expand arrow. Multi-file tabs, unified/split view, GitHub-style collapsible context, inline word-diff highlighting, and an embedded Commit & Push panel.",
   "tier": "inprocess",
   "requires_ui_refresh": true,
