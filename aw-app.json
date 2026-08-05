@@ -2,7 +2,7 @@
   "manifest_version": 1,
   "id": "diff-tool",
   "name": "Diff Tool",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Interactive git diff viewer + commit panel, decoupled from the monolith. Two entry points: an agent's show_diff MCP tool call, or the git repo nav's expand arrow. Multi-file tabs, unified/split view, GitHub-style collapsible context, inline word-diff highlighting, and an embedded Commit & Push panel.",
   "tier": "inprocess",
   "requires_ui_refresh": true,
@@ -51,7 +51,7 @@
       {
         "id": "aw-diff-tool",
         "path": "skills/aw-diff-tool/SKILL.md",
-        "description": "How to open the interactive diff viewer from an agent (show_diff MCP tool) — repo+ref auto-discovery or explicit file diffs, plus the Commit & Push panel it renders."
+        "description": "How to open the interactive diff viewer from an agent (show_diff MCP tool) \u2014 repo+ref auto-discovery or explicit file diffs, plus the Commit & Push panel it renders."
       }
     ]
   },
