@@ -1,0 +1,14 @@
+{
+  "name": "diff-tool-app-ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Component-mode frontend for aw-app-diff-tool — a headless core.nav contribution (keeps the app's own WS open so a diff_open event, from either entry point, opens a window) plus every open diff's floating window body (core.window.body:diff.viewer, one instance per diff id via the 2026-08-05 dynamic-window framework addition). src/plugin.jsx is the integrated-mode entry (register(host)), built as a Vite lib-mode bundle consumed by aw-app.json's contributes.frontend.bundle.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "manifest_version": 1,
+  "id": "diff-tool",
+  "name": "Diff Tool",
+  "version": "0.1.0",
+  "description": "Interactive git diff viewer + commit panel, decoupled from the monolith. Two entry points: an agent's show_diff MCP tool call, or the git repo nav's expand arrow. Multi-file tabs, unified/split view, GitHub-style collapsible context, inline word-diff highlighting, and an embedded Commit & Push panel.",
+  "tier": "inprocess",
+  "requires_ui_refresh": true,
+  "publisher": "TekFlox",
+  "resource_estimate": {
+    "cpu": "low",
+    "memory": "low",
+    "disk": "low"
+  },
+  "runtime": {
+    "python": ">=3.11",
+    "entrypoint": "diff_app.plugin:DiffToolAppPlugin",
+    "pip_requires": []
+  },
+  "permissions": [
+    "routes:register",
+    "ui:code",
+    "ui:slots:core.nav",
+    "ui:slots:core.window.body:diff.viewer"
+  ],
+  "contributes": {
+    "routes": [
+      {
+        "prefix": "/api/apps/diff-tool"
+      }
+    ],
+    "windows": [
+      {
+        "id": "diff.viewer",
+        "title": "Diff",
+        "icon": "git-branch",
+        "body": {
+          "type": "component"
+        }
+      }
+    ],
+    "frontend": {
+      "mode": "component",
+      "bundle": "ui/dist/diff-tool-ui.mjs",
+      "slots": [
+        "core.nav",
+        "core.window.body:diff.viewer"
+      ]
+    },
+    "skills": [
+      {
+        "id": "aw-diff-tool",
+        "path": "skills/aw-diff-tool/SKILL.md",
+        "description": "How to open the interactive diff viewer from an agent (show_diff MCP tool) — repo+ref auto-discovery or explicit file diffs, plus the Commit & Push panel it renders."
+      }
+    ]
+  },
+  "config_schema": {
+    "type": "object",
+    "properties": {},
+    "required": []
+  },
+  "dependencies": {},
+  "migrations": {}
+}
