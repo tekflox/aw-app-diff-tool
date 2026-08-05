@@ -59,8 +59,8 @@ want to hand-pick specific files/refs per file):
 ```json
 {
   "files": [
-    {"file_path": "/opt/agentic-workspace/src/foo.py", "ref": "HEAD~1"},
-    {"file_path": "/opt/agentic-workspace/src/bar.py", "diff_text": "@@ ..."}
+    {"file_path": "/opt/aw-workspace/repos/aw-app-diff-tool/src/foo.py", "ref": "HEAD~1"},
+    {"file_path": "/opt/aw-workspace/repos/aw-app-diff-tool/src/bar.py", "diff_text": "@@ ..."}
   ],
   "title": "Selected changes"
 }
