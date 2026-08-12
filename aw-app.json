@@ -47,6 +47,12 @@
         "core.window.body:diff-tool.viewer"
       ]
     },
+    "mcp": {
+      "reload_on_save": true,
+      "provides": [
+        "show_diff"
+      ]
+    },
     "skills": [
       {
         "id": "aw-diff-tool",

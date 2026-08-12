@@ -109,6 +109,63 @@ def test_from_repo_no_changes(client, tmp_path, monkeypatch):
     assert resp.json()["success"] is False
 
 
+def test_mcp_lists_show_diff(client):
+    resp = client.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+    assert resp.status_code == 200
+    tools = resp.json()["result"]["tools"]
+    assert [t["name"] for t in tools] == ["show_diff"]
+    assert "repo" in tools[0]["inputSchema"]["properties"]
+
+
+def test_mcp_initialize_and_notification(client):
+    resp = client.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "initialize"})
+    assert resp.json()["result"]["serverInfo"]["name"] == "aw-diff-tool"
+    # A notification has no id and expects no body — 202, not a JSON-RPC reply.
+    resp = client.post("/mcp", json={"jsonrpc": "2.0", "method": "notifications/initialized"})
+    assert resp.status_code == 202
+
+
+def test_mcp_show_diff_renders_and_stores(client, store, tmp_path, monkeypatch):
+    """The whole point of the MCP surface: a tools/call must produce a real
+    stored diff, going through build_diff directly rather than an HTTP hop."""
+    repos_dir = tmp_path / "repos"
+    repo = repos_dir / "work"
+    _init_repo(repo)
+    (repo / "f.txt").write_text("line1\nCHANGED\nline3\n")
+    monkeypatch.setenv("AW_APP_DIFF_TOOL_ROOT", str(tmp_path))
+
+    resp = client.post("/mcp", json={
+        "jsonrpc": "2.0", "id": 7, "method": "tools/call",
+        "params": {"name": "show_diff", "arguments": {"repo": "work", "title": "T"}},
+    })
+    assert resp.status_code == 200
+    result = resp.json()["result"]
+    assert result["isError"] is False
+    assert "1 file" in result["content"][0]["text"]
+    assert len(store._store) == 1
+    stored = next(iter(store._store.values()))
+    assert stored["title"] == "T"
+    assert "CHANGED" in stored["html"]
+
+
+def test_mcp_show_diff_reports_failure_as_tool_error(client):
+    resp = client.post("/mcp", json={
+        "jsonrpc": "2.0", "id": 8, "method": "tools/call",
+        "params": {"name": "show_diff", "arguments": {"repo": "not-a-repo-anywhere"}},
+    })
+    result = resp.json()["result"]
+    assert result["isError"] is True
+    assert "Not a git repo" in result["content"][0]["text"]
+
+
+def test_mcp_unknown_tool(client):
+    resp = client.post("/mcp", json={
+        "jsonrpc": "2.0", "id": 9, "method": "tools/call",
+        "params": {"name": "nope", "arguments": {}},
+    })
+    assert resp.json()["result"]["isError"] is True
+
+
 def test_commit_unknown_repo(client):
     resp = client.post("/commit", json={
         "repo_dir": "not-a-repo-anywhere", "files": ["f.txt"], "message": "m",
@@ -137,3 +194,50 @@ def test_activate_sets_broadcast_loop_without_relying_on_asgi_startup():
         assert plugin.store._loop is asyncio.get_running_loop()
 
     asyncio.run(run())
+
+
+def test_activate_registers_mcp_server_for_gateway_scan(tmp_path):
+    """aw-mcp-gateway discovers an app's MCP endpoint by scanning for
+    <installed-app-dir>/mcp.json. Between 2026-08-05 and 2026-08-12 this app
+    shipped no such file, so show_diff was invisible to every agent even
+    though the REST route worked — pin the registration so it can't silently
+    regress again."""
+    import asyncio
+    import json
+
+    from diff_app.plugin import DiffToolAppPlugin
+
+    class Ctx:
+        package_dir = str(tmp_path)
+
+        def on_deactivate(self, fn):
+            pass
+
+        routes = type("R", (), {"register": staticmethod(lambda subapp: None)})()
+
+    async def run():
+        await DiffToolAppPlugin().activate(Ctx())
+
+    asyncio.run(run())
+
+    data = json.loads((tmp_path / "mcp.json").read_text())
+    entry = data["mcpServers"]["aw-diff-tool"]
+    assert entry["type"] == "http"
+    assert entry["enabled"] is True
+    assert entry["url"].endswith("/api/apps/diff-tool/mcp")
+
+
+def test_activate_without_package_dir_still_succeeds():
+    """Registration is best-effort — a ctx with no package_dir (bare dev run)
+    must not stop the app from activating."""
+    import asyncio
+
+    from diff_app.plugin import DiffToolAppPlugin
+
+    class Ctx:
+        def on_deactivate(self, fn):
+            pass
+
+        routes = type("R", (), {"register": staticmethod(lambda subapp: None)})()
+
+    asyncio.run(DiffToolAppPlugin().activate(Ctx()))

@@ -26,19 +26,17 @@ framework. Not re-solved per-app.
 from __future__ import annotations
 
 import logging
-import os
 import subprocess
 
 from fastapi import Body, FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from . import render
+from .build import MOUNT_PREFIX, build_diff  # noqa: F401  (MOUNT_PREFIX re-exported)
 from .repo_paths import resolve_repo_path
 from .storage import DiffStore
 
 _log = logging.getLogger("diff_app.routes")
-
-MOUNT_PREFIX = "/api/apps/diff-tool"
 
 
 def build_app(store: DiffStore) -> FastAPI:
@@ -69,84 +67,44 @@ def build_app(store: DiffStore) -> FastAPI:
         send either mode, matching the monolith's presentation-server.py
         show_diff handler this replaces.
         """
-        import asyncio
-
-        raw_repo = data.get("repo", "")
-        top_ref = data.get("ref", "")
-        title = data.get("title", "")
-        explicit_files = data.get("files") or []
-
-        repo_path = resolve_repo_path(raw_repo) if raw_repo else None
-        if raw_repo and not repo_path:
-            return JSONResponse({"success": False, "error": f"Not a git repo: {raw_repo}"}, status_code=400)
-
-        loop = asyncio.get_running_loop()
-
-        def _build():
-            capped = False
-            if explicit_files:
-                changed = explicit_files
-            else:
-                if not repo_path:
-                    return {"success": False, "error": "repo or files is required"}
-                cmd = ["git", "diff", "--name-only"]
-                if top_ref:
-                    cmd.append(top_ref)
-                result = subprocess.run(cmd, capture_output=True, text=True, cwd=repo_path, timeout=30)
-                changed_names = [f.strip() for f in result.stdout.splitlines() if f.strip()]
-                if not changed_names:
-                    return {"success": False, "error": "No changes found"}
-                capped = len(changed_names) > 50
-                if capped:
-                    changed_names = changed_names[:50]
-                changed = [{"file_path": os.path.join(repo_path, f)} for f in changed_names]
-
-            files_data = []
-            for f in changed:
-                file_path = f["file_path"] if os.path.isabs(f["file_path"]) else (
-                    os.path.join(repo_path, f["file_path"]) if repo_path else f["file_path"]
-                )
-                diff_text = f.get("diff_text") or render.compute_git_diff(file_path, f.get("ref") or top_ref)
-                if not diff_text:
-                    continue
-                # rel_path must be the path relative to the repo root (e.g.
-                # "src/api/routes/git_ops.py"), NOT os.path.basename(file_path)
-                # — it becomes the commit checkbox's data-path, POSTed back to
-                # /commit and fed to `git add --`. Using the basename makes
-                # `git add` a no-op ("pathspec did not match any files"), so
-                # the commit silently produces no changes despite reporting
-                # success. Ported verbatim from the monolith's git_ops.py.
-                rel_path = file_path
-                if repo_path:
-                    try:
-                        rel_path = os.path.relpath(file_path, repo_path)
-                    except ValueError:
-                        pass
-                files_data.append({"file_path": file_path, "diff_text": diff_text, "rel_path": rel_path})
-
-            if not files_data:
-                return {"success": False, "error": "No diffs found for the provided files"}
-
-            if repo_path:
-                repo_name = os.path.basename(repo_path)
-                suffix = f" (first 50 of {len(changed)}+)" if capped else ""
-                diff_title = (title or f"Diff: {repo_name} vs {top_ref or 'working tree'}") + suffix
-            else:
-                file_names = ", ".join(os.path.basename(f["file_path"]) for f in files_data)
-                diff_title = title or f"Diff: {file_names}"
-
-            html = render.generate_diff_html(
-                files_data,
-                repo_dir=repo_path,
-                commit_path=f"{MOUNT_PREFIX}/commit",
-            )
-            entry = store.create(diff_title, html)
-            return {"success": True, "diff_id": entry["id"], "files": len(files_data), "capped": capped}
-
         try:
-            return await loop.run_in_executor(None, _build)
+            result = await run_in_threadpool(
+                build_diff, store,
+                repo=data.get("repo", ""), ref=data.get("ref", ""),
+                title=data.get("title", ""), files=data.get("files"),
+            )
         except Exception as e:
             return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+        status = result.pop("status", None)
+        if status is not None:
+            return JSONResponse(result, status_code=status)
+        return result
+
+    # ------------------------------------------------------------------
+    # MCP — Streamable HTTP, auto-discovered by aw-mcp-gateway's app-scan
+    # (see mcp/self_register.py + mcp/http_handler.py).
+    # ------------------------------------------------------------------
+
+    @api.post("/mcp")
+    async def mcp_post(data: dict | list = Body(...)):
+        from fastapi.responses import Response
+
+        from .mcp.http_handler import handle_request as mcp_handle_request
+
+        messages = data if isinstance(data, list) else [data]
+        responses = []
+        for m in messages:
+            r = await mcp_handle_request(m, store=store)
+            if r is not None:
+                responses.append(r)
+        if not responses:
+            return Response(status_code=202)
+        return JSONResponse(responses if isinstance(data, list) else responses[0])
+
+    @api.get("/mcp")
+    async def mcp_get():
+        from fastapi.responses import Response
+        return Response(status_code=405)
 
     @api.post("/commit")
     async def commit_and_push(data: dict = Body(...)):

@@ -70,10 +70,11 @@ want to hand-pick specific files/refs per file):
 
 The tool renders the diff HTML, stores it, and broadcasts a `diff_open`
 event over this app's own WebSocket — the dashboard opens a new window
-instance automatically. The returned result string includes added/removed
-line counts; report that back to the user in your own reply rather than
-re-describing the diff textually (they'll see the real thing in the
-window).
+instance automatically. The returned result string is
+`Diff displayed: <id> (<n> files)`, plus `, capped at 50` when
+auto-discovery hit the file cap; report that back to the user in your own
+reply rather than re-describing the diff textually (they'll see the real
+thing in the window).
 
 ## Commit & Push panel
 

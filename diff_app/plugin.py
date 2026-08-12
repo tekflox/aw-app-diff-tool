@@ -12,8 +12,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 
 from . import routes as routes_mod
+from .mcp import self_register as mcp_self_register
 from .storage import DiffStore
 
 log = logging.getLogger("aw_apps.diff_tool")
@@ -35,6 +37,14 @@ class DiffToolAppPlugin:
         subapp = routes_mod.build_app(self.store)
         ctx.routes.register(subapp)
         ctx.on_deactivate(self._close_all_sockets)
+
+        # Discoverable by aw-mcp-gateway's app-scan — see mcp/self_register.py.
+        # Best-effort by design: registration is how OTHER processes find us,
+        # never something this app's own routes depend on, so a ctx without a
+        # package_dir (bare dev run, minimal test double) must still activate.
+        port = int(os.environ.get("AW_PORT", "9030"))
+        mcp_self_register.register_self(getattr(ctx, "package_dir", "") or "", port)
+
         log.info("aw-app-diff-tool activated")
 
     async def deactivate(self) -> None:
