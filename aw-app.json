@@ -19,6 +19,7 @@
   },
   "permissions": [
     "routes:register",
+    "fs:workspace-data",
     "ui:code",
     "ui:slots:core.nav",
     "ui:slots:core.window.body:diff-tool.viewer"

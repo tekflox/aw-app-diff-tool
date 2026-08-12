@@ -4,9 +4,10 @@
 Ports the monolith's ``src/api/routes/diff.py`` +
 ``src/api/routes/git_ops.py``'s diff/commit endpoints onto the F4 ``ctx``
 facades — ``ctx.routes`` (``routes:register``) mounts this app's sub-app at
-``/api/apps/diff-tool``. No ``db:own-tables`` — diffs are ephemeral
-(``DiffStore`` is a plain in-memory LRU, matching the monolith's original
-behavior), so nothing needs to survive a restart.
+``/api/apps/diff-tool``. Still no ``db:own-tables``: diffs are cache entries
+with a retention cap, not records. They do outlive a restart now, through
+``fs:workspace-data`` (a JSON file per diff under the app's own data dir) —
+see ``storage.py`` for why that changed.
 """
 from __future__ import annotations
 
@@ -16,15 +17,32 @@ import os
 
 from . import routes as routes_mod
 from .mcp import self_register as mcp_self_register
-from .storage import DiffStore
+from .storage import DiffStore, default_data_dir
 
 log = logging.getLogger("aw_apps.diff_tool")
+
+PERSIST_CAPABILITY = "fs:workspace-data"
+
+
+def _may_persist(ctx) -> bool:
+    """True unless the host tells us the capability was withheld.
+
+    ``ctx.has`` is the real answer; a minimal test double or a bare dev run
+    without one gets the benefit of the doubt, same as the MCP self-register
+    below — this app must still activate against a stub ctx.
+    """
+    has = getattr(ctx, "has", None)
+    return has(PERSIST_CAPABILITY) if callable(has) else True
 
 
 class DiffToolAppPlugin:
     async def activate(self, ctx) -> None:
         self.ctx = ctx
-        self.store = DiffStore()
+        # There is no ctx facade for fs:workspace-data yet (framework gap the
+        # whiteboard migration flagged too) — an inprocess app resolves the
+        # path itself. Honour the grant anyway: without it, no disk cache.
+        data_dir = default_data_dir() if _may_persist(ctx) else None
+        self.store = DiffStore(data_dir)
         # F1 hot-loads this app's sub-app via a Mount() into the ALREADY
         # running process — Starlette's own @api.on_event("startup") never
         # fires for a hot-mounted app (the outer app's startup sequence has
