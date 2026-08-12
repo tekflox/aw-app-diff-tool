@@ -23,7 +23,13 @@
 //    response and can call window.__awOpenAppWindow directly — but reusing
 //    the same broadcast keeps both entry points on one code path.
 //
-// 2. DiffWindowBody -> core.window.body:diff-tool.viewer. Like Presentations,
+// 2. DiffWindowActions -> core.window.titlebar:diff-tool.viewer. The pop-out
+//    button, registered via host.registerWindowActions so it lands in the
+//    HOST's title bar. It used to be a second full-width bar drawn above the
+//    iframe in (3), back when a window's chrome was closed to apps — two
+//    stacked headers for a single icon. Same move aw-app-whiteboard made.
+//
+// 3. DiffWindowBody -> core.window.body:diff-tool.viewer. Like Presentations,
 //    this app opens MANY windows at once — one per diff id. Uses the
 //    2026-08-05 framework addition: window.__awOpenAppWindow(windowId,
 //    instanceId, title) keys the window as `appwin:<windowId>:<instanceId>`
@@ -67,37 +73,51 @@ export function register(host) {
     return null;
   }
 
-  // ------------------------------------------------------------------
-  // 2. Window body — one per open diff (instanceId = diff id)
-  // ------------------------------------------------------------------
-  // BasicWindow.jsx already supplies the window chrome (title, maximize,
-  // close) around this slot — unlike Presentations (editable title, share,
-  // export), a diff window needs no extra chrome of its own, so this is
-  // just the iframe plus one genuinely new action (pop out to a real
-  // browser window/tab, useful for a wide side-by-side split view).
-  function DiffWindowBody({ instanceId }) {
-    const diffId = instanceId;
+  // The diff's own HTML page is reached the same way from the title-bar
+  // action and the body's iframe. Absolute URL required — <iframe src> and
+  // window.open() are resolved directly by the browser, bypassing the
+  // fetch/XHR-only apiBase.js rewrite shim a relative path depends on (same
+  // class of bug fixed in Whiteboard/Presentations/RepoNav — see
+  // aw-workspace-ui's pluginHost.js host.app.absoluteApiUrl doc comment).
+  const diffHtmlUrl = (diffId) => (diffId ? host.app.absoluteApiUrl(`/diffs/${diffId}/html`) : null);
 
-    // Absolute URL required — <iframe src> and window.open() are resolved
-    // directly by the browser, bypassing the fetch/XHR-only apiBase.js
-    // rewrite shim a relative path depends on (same class of bug fixed in
-    // Whiteboard/Presentations/RepoNav — see aw-workspace-ui's
-    // pluginHost.js host.app.absoluteApiUrl doc comment).
-    const htmlUrl = diffId ? host.app.absoluteApiUrl(`/diffs/${diffId}/html`) : null;
+  // ------------------------------------------------------------------
+  // 2. Title-bar actions — pop out to a real browser window
+  // ------------------------------------------------------------------
+  // A SIBLING slot contribution to the body below, not its parent: the host
+  // renders this inside its own header (core.window.titlebar:diff-tool.viewer)
+  // and the body under it. Nothing is shared between the two, so no
+  // cross-component plumbing is needed here (unlike Whiteboard's export, which
+  // has to reach the body's iframe) — both just derive the URL from instanceId.
+  //
+  // No Maximize/Close here on purpose — the host's header already has them.
+  function DiffWindowActions({ instanceId }) {
+    const htmlUrl = diffHtmlUrl(instanceId);
+    if (!htmlUrl) return null;
+    return (
+      <button
+        onClick={() => window.open(htmlUrl, `diff-${instanceId}`, 'popup=1,width=1100,height=750')}
+        className="p-1 rounded hover:bg-white/10 text-[var(--color-text-muted)]"
+        title="Pop out to new window"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
+        </svg>
+      </button>
+    );
+  }
+
+  // ------------------------------------------------------------------
+  // 3. Window body — one per open diff (instanceId = diff id)
+  // ------------------------------------------------------------------
+  // Just the iframe now: BasicWindow.jsx supplies the chrome (title, maximize,
+  // close) and the pop-out button moved up into it, so the window has one
+  // header instead of two and the diff gets that ~29px back.
+  function DiffWindowBody({ instanceId }) {
+    const htmlUrl = diffHtmlUrl(instanceId);
 
     return (
       <div className="flex flex-col bg-[var(--color-bg-secondary)] h-full">
-        <div className="flex items-center justify-end px-2 py-1 border-b border-[var(--color-border)] shrink-0" onMouseDown={(e) => e.stopPropagation()}>
-          <button
-            onClick={() => { if (htmlUrl) window.open(htmlUrl, `diff-${diffId}`, 'popup=1,width=1100,height=750'); }}
-            className="p-1.5 rounded hover:bg-white/10 transition-colors"
-            title="Pop out to new window"
-          >
-            <svg className="w-4 h-4 text-[var(--color-text-muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
-            </svg>
-          </button>
-        </div>
         <div className="flex-1 relative">
           {htmlUrl && (
             <iframe
@@ -114,6 +134,11 @@ export function register(host) {
 
   host.registerSlot('core.nav', DiffToolListener);
   host.registerWindow('diff-tool.viewer', DiffWindowBody);
+  // Needs an aw-workspace-ui new enough to expose it (and to render the
+  // core.window.titlebar:<id> slot at all) — on an older host this is simply
+  // absent, and the window keeps its single header with no app buttons
+  // rather than throwing during register().
+  host.registerWindowActions?.('diff-tool.viewer', DiffWindowActions);
 }
 
 export default register;
