@@ -56,7 +56,17 @@ export function register(host) {
             if (msg.type !== 'diff_open' || !msg.diff) return;
             window.__awOpenAppWindow?.('diff-tool.viewer', msg.diff.id, msg.diff.title);
           };
-          ws.onclose = () => { if (!closed) reconnectTimer = setTimeout(connect, 5000); };
+          ws.onclose = (event) => {
+            // IdentityGuard closes 4401 (also 4403/4426) when the workspace
+            // session itself is invalid — auto-reconnecting into that wall
+            // hides a "logged out" state forever. Stop, and let the host
+            // app's aw-auth-failed listener put the user back at login.
+            if (event.code === 4401 || event.code === 4403 || event.code === 4426) {
+              try { window.dispatchEvent(new Event('aw-auth-failed')); } catch {}
+              return;
+            }
+            if (!closed) reconnectTimer = setTimeout(connect, 5000);
+          };
           ws.onerror = () => { try { ws.close(); } catch {} };
         } catch {
           if (!closed) reconnectTimer = setTimeout(connect, 5000);
