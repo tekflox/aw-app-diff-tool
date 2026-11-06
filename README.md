@@ -21,3 +21,5 @@ Open Diff Tool from the workspace when a repository has changes, or let an agent
 ## What It Delivers
 
 The app gives AW Workspace a visual review surface for git changes. It makes review, commit, and push workflows easier to follow for both users and agents.
+
+<!-- fleet migration B4: follow-up no-op to prove the comment + workflow_run merge paths -->
