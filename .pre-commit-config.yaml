@@ -1,0 +1,57 @@
+# pre-commit — fast local subset of CI, per docs/standards/pipeline-testing.md §6.
+#
+# NOT a replacement for CI: hooks are bypassable (--no-verify) and are not
+# installed on a fresh clone until `pre-commit install` is run. The test
+# suite is deliberately NOT a hook here — see §6's three reasons.
+#
+# Install once per clone:
+#   pip install -r requirements-dev.txt && pre-commit install
+#
+# ruff-format is deliberately NOT enabled yet: this codebase has never been
+# ruff-formatted (measured 2026-11-06: 10 of 16 files would reformat), and
+# ruff-format rewrites a hook's target file in full. Needs its own one-time
+# format commit first — see §6b.
+#
+# Unlike aw-app-presentations/mobile/notion in this same batch, the ruff
+# hook here does NOT need the §6c select override: this repo's import-order
+# baseline measured 2026-11-06 is already clean (0 I001 findings; the 4
+# E741 + 1 F841 found are pre-existing and unrelated to import order), so
+# `--fix` with the full select cannot reorder anything that isn't already
+# sorted.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.3
+    hooks:
+      - id: ruff
+        args: [--fix]
+
+  - repo: local
+    hooks:
+      - id: pylint-errors-only
+        name: pylint (E-class only, blocking — same gate as CI)
+        entry: pylint --disable=all --enable=E --disable=E0401,E1101
+        language: system
+        types: [python]
+        files: ^diff_app/
+
+      - id: validate-manifest
+        name: validate aw-app.json
+        entry: python3 tests/validate_manifest.py
+        language: system
+        pass_filenames: false
+        files: ^aw-app\.json$
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^ui/dist/
+      - id: end-of-file-fixer
+        exclude: ^ui/dist/
+      - id: check-added-large-files
+      - id: check-merge-conflict
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
