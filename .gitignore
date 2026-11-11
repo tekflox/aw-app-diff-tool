@@ -58,3 +58,7 @@ ui/coverage/
 tmp/
 temp/
 *.log
+
+# self_register.py writes this with a live X-Api-Key in plaintext —
+# never commit it (workspace-api-key-leak precedent).
+mcp.json
